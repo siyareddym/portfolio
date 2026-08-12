@@ -1,0 +1,127 @@
+---
+title: "Cleaning Corrupted POS Data in Excel"
+author: "Siya Muthirevulu"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    theme: cosmo
+---
+
+[Download the full workbook (.xlsm)](Excel_Data_Cleaning_Project.xlsm)
+
+## 1. Problem Statement
+
+A local coffee shop's point-of-sale system presented with corrupted characters, malformed dates, and inconsistent formatting into one week of transaction data. The task: rebuild a **dynamic** cleaning process that could take a fresh batch of corrupted data pasted into the same columns and re-clean it automatically, without manually rewriting formulas each time. Then, run exploratory analysis on the recovered data.
+
+Three fields needed cleaning: **Date**, **Item**, and **PricePoint**. All formulas below are live Excel formulas, not one-time manual fixes.
+
+## 2. Date Repair
+
+Dates arrived as inconsistent text strings like `"2025++5/25"` instead of real Excel dates.
+
+```excel
+=TEXTSPLIT(B2,{"++","/"})
+```
+Splits the raw string on two different delimiters at once (`++` and `/`) into separate year/month/day pieces with the `TEXTSPLIT` function that handles multiple delimiters in one call, instead of nesting several `LEFT`/`MID`/`FIND` formulas.
+
+```excel
+=DATE(J2,K2,L2)
+=IF(M2=9999,"???",M2)
+```
+Reconstructs a real date from the split parts, then flags unrecoverable rows with `???` instead of a broken value — so downstream analysis never silently includes garbage.
+
+### Before → After
+
+| Transaction ID | Raw Date | Cleaned Date |
+|---|---|---|
+| 427999 | `2025++5/25` | 5/25/2025 |
+| 428002 | `1927++5/17` | **`???`** |
+
+That second row exposes a genuine bug, verified against the workbook's own computed values — and it's more interesting than a simple missed edge case. `DATE(1927, 5, 17)` doesn't fail to parse; it correctly returns a valid date serial number. The problem is that this particular date's serial number **is exactly 9999** — the same value chosen as the sentinel for "this date is invalid." So a perfectly legitimate (if suspiciously old) date gets *wrongly flagged as broken*, precisely because the sentinel value wasn't actually impossible to collide with. This is a real, well-known category of bug in data engineering — picking a "magic value" to mean missing/invalid without confirming it can never occur naturally in the data. A more robust fix would use a value clearly outside any valid date serial range (e.g., a negative number, or a dedicated boolean flag column) instead of overloading a plausible date value as the error signal.
+
+## 3. Item Name Repair
+
+Item names had corrupted encoding artifacts (`©`, `☐`, `§`) injected in place of spaces.
+
+```excel
+=SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(D2,"©"," "),"☐"," "),"§"," ")
+=PROPER(TRIM(CLEAN(P2)))
+```
+Nested `SUBSTITUTE()` calls strip each corrupted character in turn, then `CLEAN()` removes any remaining non-printable characters, `TRIM()` collapses extra whitespace, and `PROPER()` normalizes capitalization — a standard three-function stack for text normalization.
+
+### Before → After
+
+| Raw Item | Cleaned Item |
+|---|---|
+| `Candy©bar` | Candy Bar |
+| `French☐press☐` | French Press |
+| `§French§press` | French Press |
+| `Scone©with©clotted©cream©and©jam` | Scone With Clotted Cream And Jam |
+
+## 4. Price Point Standardization
+
+```excel
+=SUBSTITUTE(E2,"ounce","oz")
+```
+Standardizes unit labeling so it matches the format used in the shop's existing price list (e.g., `"12 ounce"` → `"12 oz"`), keeping the cleaned data consistent with everything already on file.
+
+## 5. Exploratory Analysis
+
+Once the data was clean, I built a lookup key and ran revenue analysis:
+
+```excel
+=CONCAT(D2,F2)
+=E2*XLOOKUP(L2,PriceListData!$F$2:$F$97,PriceListData!$E$2:$E$97)
+```
+`CONCAT` builds a composite key (Item + Price Point, e.g. `"Cappuccino12 oz"`) so each specific size/variant of a product can be matched to its correct price via `XLOOKUP` — the modern, more flexible successor to `VLOOKUP` (it can look left or right, and returns a clear result instead of `#N/A` when paired with its `if_not_found` argument).
+
+```excel
+=UNIQUE(TransactionData!A2:A7396)
+=SUMIF(TransactionData!$A$2:$A$7396, O2, TransactionData!$M$2:$M$7396)
+```
+`UNIQUE` deduplicates transaction IDs (a single purchase can span multiple rows if several items were bought together), and `SUMIF` rolls up total revenue per transaction.
+
+From there, I computed a full descriptive statistics summary including mean, median, standard deviation, skewness, and a five-number summary via `QUARTILE.INC` along with a histogram of the per-transaction revenue distribution to visualize spending patterns.
+
+## 6. Pivot Table Analysis
+
+With the data cleaned, I used PivotTables to answer a set of specific business questions, each one built on a "scratch" sheet, then the headline answer surfaced onto a clean summary sheet so the underlying pivot mechanics don't clutter the final report.
+
+### Product Analysis
+
+| Question | Pivot Table Structure | Answer |
+|---|---|---|
+| What item appears in the most transactions? | Rows: `Item` → Values: `Count of Transaction ID` | Pourover |
+| What item was purchased in the largest total quantity? | Rows: `Item` → Values: `Sum of Qty` | Pourover (4,144 units) |
+| What *food* item was purchased in the largest total quantity? | Same as above, **filtered** to `Category = Food` | Sticky bun |
+| Which type of whole beans sold in the largest total quantity? | Rows: `Item` → Values: `Sum of Qty`, **filtered** to `Type = Whole beans` | Single-origin (210 vs. House blend's 118) |
+
+The filtered versions are the more interesting technique here: rather than building a separate pivot from scratch for "food items only" or "whole beans only," I applied a report filter to the same base structure having the same fields, narrower scope, different question answered.
+
+### Trend Analysis
+
+| Question | Pivot Table Structure | Answer |
+|---|---|---|
+| What hour does hot drink revenue peak? | Rows: `Time (Hour)` → Values: `Sum of Revenue`, filtered to `Type = Hot drink` | 10 AM |
+| What days have the lowest sales for the most popular brewed coffee size? | Rows: `Day of the Week` → Values: `Sum of Qty`, filtered to `Category = Brewed coffee`, `Price Point = 12 oz` | Monday and Wednesday |
+| Which product type has the most dramatic swing in sales across the week? | Rows: `Category` × Columns: `Day of the Week` → Values: `Sum of Qty`, plus a calculated **range** column (`MAX − MIN` across the week) | Hot Drinks (98-unit swing — largest of any category) |
+
+That third one is a two-dimensional pivot, a category down the rows, weekday across the columns, with an extra calculated column added alongside the pivot to measure volatility, not just totals. Turning "which category has the most dramatic swing" into a concrete number (rather than eyeballing a table) is the kind of small addition that makes a pivot table answer a sharper question than it can out of the box.
+
+### Basket Analysis: A Transaction × Item Incidence Matrix
+
+The most advanced pivot in the workbook answers: **"What cold drink item is most often purchased alongside something from the beans category?"** (Answer: **Frappé**.)
+
+Instead of a normal summary pivot, this one uses **Rows: `Transaction ID`, Columns: `Item`, Values: `Count of Category`** — turning the pivot into a large incidence matrix where each row is one transaction and each column is one item, with a 1 marking "this item was in this transaction." That structure is what makes co-occurrence analysis possible: it lets you see which items tend to show up in the *same* transaction as beans purchases, which a simple one-dimensional pivot can't answer. This is the same basic idea behind real market-basket analysis ("customers who bought X also bought Y"), built here entirely with native PivotTable features rather than a specialized tool.
+
+## 7. What I'd Improve
+
+- Replace the `9999` sentinel with a value guaranteed never to collide with a real date serial number (see Section 2), or better, use a separate boolean flag column instead of overloading the date field itself to signal validity.
+- Add a validation flag column that counts how many corrections were applied per row, to make it easy to spot rows that needed unusually heavy cleanup and might warrant a manual look.
+- The transaction × item incidence matrix (Section 6) is powerful but manual — for a larger item catalog, a proper association-rule approach (support/confidence/lift, as in market-basket analysis) would scale better than reading off a large pivot table by eye.
+
+---
+
+*Course project for K303 (Data Analytics), Kelley School of Business, Indiana University.*

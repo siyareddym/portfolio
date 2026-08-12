@@ -1,0 +1,27 @@
+project:
+  type: website
+
+website:
+  title: "Data Portfolio"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: heart-disease/heart-disease-prediction.qmd
+        text: Heart Disease
+      - href: sql-database/sql-database.qmd
+        text: SQL
+      - href: excel-data-cleaning/excel-data-cleaning.qmd
+        text: Excel Cleaning
+      - href: coffee-investment-analysis/coffee-investment-analysis.qmd
+        text: Power BI & Excel Analysis
+      - href: about.qmd
+        text: About
+
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+

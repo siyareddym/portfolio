@@ -1,0 +1,15 @@
+{
+  "hash": "45557a878b7ab44afc2a8b1e29955563",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Your Name\"\n---\n\n## Hi, I'm Siya Muthirevulu\n\nI'm a Information Systems student learning data analysis with R. This site collects data science projects; each one walks through the full process: cleaning real-world data, building models, and honestly reporting what the results actually show.\n\n### Projects\n\n- **[Heart Disease Risk Prediction](heart-disease/heart-disease-prediction.qmd)** — Logistic regression vs. random forest for classifying heart disease risk, with confusion matrices and ROC curves.\n---\n\nThis is a Quarto website.\n\nTo learn more about Quarto websites visit <https://quarto.org/docs/websites>.\n\n\n::: {.cell}\n\n```{.r .cell-code}\n1 + 1\n```\n\n::: {.cell-output .cell-output-stdout}\n\n```\n[1] 2\n```\n\n\n:::\n:::\n\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}

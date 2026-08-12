@@ -1,0 +1,14 @@
+---
+title: "Home"
+---
+
+## Hello, I'm Siya Muthirevulu
+
+I'm a Information Systems student passionate about learning data analysis through various languages and programs. This site collects data science projects; each one walks through the full process: cleaning real-world data, building models, and reporting what the results actually show.
+
+### Projects
+
+- **[Heart Disease Risk Prediction](heart-disease/heart-disease-prediction.qmd)** — Logistic regression vs. random forest for classifying heart disease risk, with confusion matrices and ROC curves.
+- **[Database Querying with SQL](sql-database/sql-database.qmd)** — Filtering, aggregation, joins, HAVING, and layered subqueries in MS Access, run against a multi-table employee/member/transaction database.
+- **[Cleaning Corrupted POS Data in Excel](excel-data-cleaning/excel-data-cleaning.qmd)** — Dynamic formula-based data cleansing (TEXTSPLIT, nested SUBSTITUTE, XLOOKUP) on corrupted point-of-sale transaction data, plus exploratory revenue analysis.
+---

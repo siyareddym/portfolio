@@ -1,0 +1,251 @@
+---
+title: "Predicting Heart Disease Risk: Logistic Regression vs. Random Forest"
+author: "Siya Muthirevulu"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-tools: true
+    theme: cosmo
+    fig-width: 8
+    fig-height: 5
+execute:
+  warning: false
+  message: false
+---
+
+## 1. Problem Statement
+
+Can patient health data, such as blood pressure, cholesterol, BMI, smoking status, exercise habits, and 15 other features, predict whether someone has heart disease?
+
+Data: [Heart Disease Risk dataset](https://www.kaggle.com/) (10,000 patient records, 21 columns, binary target `Heart Disease Status`).
+
+Two models are compared using an identical preprocessing pipeline, for a fair comparison:
+
+1.  **Logistic Regression** (`glm`): a linear baseline
+2.  **Random Forest** (`ranger`, 500 trees): can capture non-linear patterns and feature interactions that logistic regression structurally cannot
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(tidymodels)
+library(ranger)
+
+theme_set(theme_minimal(base_size = 12))
+```
+
+## 2. Load & Clean Data
+
+```{r}
+#| label: load-data
+heart <- read_csv("data/heart_disease.csv", show_col_types = FALSE)
+glimpse(heart)
+```
+
+### Missingness
+
+```{r}
+#| label: missingness
+colSums(is.na(heart))
+```
+
+Every column has only light, scattered missingness (roughly 0.2–0.3% of rows each). With nothing standing out as a heavily-missing column, the simplest defensible approach is **listwise deletion**, drop any row with at least one missing value, rather than building per-column imputation logic that would add complexity without meaningfully changing the results.
+
+```{r}
+#| label: clean
+heart_clean <- heart %>% drop_na()
+
+nrow(heart)
+nrow(heart_clean)
+```
+
+This drops about 5% of rows (10,000 → 9,500), a reasonable trade-off for guaranteeing a fully complete dataset.
+
+### Class Balance
+
+```{r}
+#| label: class-balance
+heart_clean %>% count(`Heart Disease Status`) %>% mutate(pct = n / sum(n))
+```
+
+The target is **imbalanced: \~80% No / \~20% Yes.** This one fact drives several downstream decisions:
+
+- A model that always predicts "No" already scores 80% accuracy while being clinically useless, so **accuracy alone is not a trustworthy metric.**
+- The train/test split must be **stratified** on this column to preserve the ratio in both sets.
+- **Sensitivity** (catching actual positive cases) matters more than raw accuracy in a health-screening context, since a false negative (telling a sick patient they're fine) is the costlier mistake.
+
+## 3. Train/Test Split & Preprocessing
+
+```{r}
+#| label: split
+set.seed(42)
+
+split <- initial_split(heart_clean, prop = 0.8, strata = `Heart Disease Status`)
+train_data <- training(split)
+test_data  <- testing(split)
+
+nrow(train_data)
+nrow(test_data)
+```
+
+```{r}
+#| label: recipe
+heart_recipe <- recipe(`Heart Disease Status` ~ ., data = train_data) %>%
+  step_dummy(all_nominal_predictors())
+
+heart_recipe
+```
+
+One shared recipe feeds both models below, so any performance difference between them reflects the *model*, not inconsistent preprocessing.
+
+## 4. Model 1 — Logistic Regression
+
+```{r}
+#| label: log-reg-fit
+log_reg_spec <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+log_reg_workflow <- workflow() %>%
+  add_recipe(heart_recipe) %>%
+  add_model(log_reg_spec)
+
+log_reg_fit <- fit(log_reg_workflow, data = train_data)
+log_reg_fit
+```
+
+```{r}
+#| label: log-reg-predict
+class_preds <- predict(log_reg_fit, new_data = test_data, type = "class")
+prob_preds  <- predict(log_reg_fit, new_data = test_data, type = "prob")
+
+results <- test_data %>%
+  select(`Heart Disease Status`) %>%
+  mutate(`Heart Disease Status` = factor(`Heart Disease Status`, levels = c("No", "Yes"))) %>%
+  bind_cols(class_preds) %>%
+  bind_cols(prob_preds)
+```
+
+### Confusion Matrix
+
+```{r}
+#| label: log-reg-confusion
+conf_matrix <- conf_mat(results, truth = `Heart Disease Status`, estimate = .pred_class)
+conf_matrix
+autoplot(conf_matrix, type = "heatmap")
+```
+
+### Classification Metrics
+
+Note `event_level = "second"` below which tells yardstick to treat **"Yes" as the positive class**. Without it, yardstick defaults to the *first* factor level as "positive," which silently computes sensitivity/specificity for the wrong class.
+
+```{r}
+#| label: log-reg-metrics
+class_metrics <- metric_set(accuracy, sensitivity, specificity, precision)
+class_metrics(results, truth = `Heart Disease Status`, estimate = .pred_class, event_level = "second")
+```
+
+### ROC Curve
+
+```{r}
+#| label: log-reg-roc
+roc_curve_data <- roc_curve(results, truth = `Heart Disease Status`, .pred_Yes, event_level = "second")
+autoplot(roc_curve_data)
+
+roc_auc(results, truth = `Heart Disease Status`, .pred_Yes, event_level = "second")
+```
+
+## 5. Model 2 — Random Forest
+
+```{r}
+#| label: rf-fit
+rf_spec <- rand_forest(trees = 500) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+rf_workflow <- workflow() %>%
+  add_recipe(heart_recipe) %>%
+  add_model(rf_spec)
+
+rf_fit <- fit(rf_workflow, data = train_data)
+rf_fit
+```
+
+```{r}
+#| label: rf-predict
+rf_class_preds <- predict(rf_fit, new_data = test_data, type = "class")
+rf_prob_preds  <- predict(rf_fit, new_data = test_data, type = "prob")
+
+rf_results <- test_data %>%
+  select(`Heart Disease Status`) %>%
+  mutate(`Heart Disease Status` = factor(`Heart Disease Status`, levels = c("No", "Yes"))) %>%
+  bind_cols(rf_class_preds) %>%
+  bind_cols(rf_prob_preds)
+```
+
+### Confusion Matrix
+
+```{r}
+#| label: rf-confusion
+rf_conf_matrix <- conf_mat(rf_results, truth = `Heart Disease Status`, estimate = .pred_class)
+rf_conf_matrix
+autoplot(rf_conf_matrix, type = "heatmap")
+```
+
+### Classification Metrics & ROC
+
+```{r}
+#| label: rf-metrics
+class_metrics(rf_results, truth = `Heart Disease Status`, estimate = .pred_class, event_level = "second")
+
+rf_roc_data <- roc_curve(rf_results, truth = `Heart Disease Status`, .pred_Yes, event_level = "second")
+autoplot(rf_roc_data)
+
+roc_auc(rf_results, truth = `Heart Disease Status`, .pred_Yes, event_level = "second")
+```
+
+## 6. Model Comparison
+
+```{r}
+#| label: model-comparison
+model_comparison <- bind_rows(
+  class_metrics(results, truth = `Heart Disease Status`, estimate = .pred_class, event_level = "second") %>%
+    mutate(model = "Logistic Regression"),
+  class_metrics(rf_results, truth = `Heart Disease Status`, estimate = .pred_class, event_level = "second") %>%
+    mutate(model = "Random Forest")
+) %>%
+  bind_rows(
+    roc_auc(results, truth = `Heart Disease Status`, .pred_Yes, event_level = "second") %>% mutate(model = "Logistic Regression"),
+    roc_auc(rf_results, truth = `Heart Disease Status`, .pred_Yes, event_level = "second") %>% mutate(model = "Random Forest")
+  ) %>%
+  select(model, .metric, .estimate) %>%
+  pivot_wider(names_from = .metric, values_from = .estimate)
+
+model_comparison
+```
+
+## 7. Results & Conclusion
+
+Both models converge on the same result:
+
+| Metric | Logistic Regression | Random Forest |
+|----|----|----|
+| Accuracy | 0.800 | 0.800 |
+| Sensitivity | 0.000 | 0.000 |
+| Specificity | 1.000 | 1.000 |
+| Precision | NA (no positive predictions made) | NA (no positive predictions made) |
+| ROC AUC | 0.476 | 0.477 |
+
+**Headline finding: neither model found usable signal in these features.** Both an AUC of \~0.48 (versus 0.5 for a coin flip) and a confusion matrix where *every single test-set prediction was "No"* point to the same conclusion that at the default 50% classification threshold, the model has learned that predicting the majority class is the safest bet, because none of the 20 predictors (age, blood pressure, cholesterol, smoking, exercise habits, etc.) are informative enough on their own to justify ever predicting "Yes."
+
+This is not a coding error or a modeling mistake and it's confirmed by **two structurally different model types landing on the same result.** Logistic regression can only detect linear relationships; random forest can detect non-linear patterns and feature interactions. Agreement between them is stronger evidence of "no signal in the data" than either model failing alone would be.
+
+**Why this matters for interpreting the dataset**: datasets like this are sometimes synthetically generated for practice purposes, which can mean the relationship between features and outcome is intentionally weak or randomized rather than reflecting real clinical patterns. Reporting a null result clearly rather than tuning parameters until a misleadingly optimistic number appears is the more defensible, more useful analysis.
+
+**What I'd try next:** - Lower the classification threshold well below 50% (e.g. flag "Yes" at \>20% predicted probability) to explore the sensitivity/specificity tradeoff directly, even though it won't change the underlying AUC. - Check feature-target correlations individually before modeling, to catch a signal-free dataset earlier in the process. - If treating this as a real screening tool, prioritize collecting features with known clinical predictive value (family history detail, actual lab panels, prior cardiac events) over adding more model complexity.
+
+------------------------------------------------------------------------
+
+*Data source: Heart Disease Risk dataset, Kaggle.*

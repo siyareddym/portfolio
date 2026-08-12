@@ -1,0 +1,29 @@
+{
+  "index.qmd": {
+    "index.html": "fa6df92b"
+  },
+  "about.qmd": {
+    "about.html": "fc647569"
+  },
+  "heart-disease/heart-disease-prediction.qmd": {
+    "heart-disease-prediction.html": "637286b1"
+  },
+  "sql-database.qmd": {
+    "sql-database.html": "47830ba7"
+  },
+  "excel-data-cleaning/excel-data-cleaning.qmd": {
+    "excel-data-cleaning.html": "49b4f805"
+  },
+  "excel-data-cleaning.qmd": {
+    "excel-data-cleaning.html": "a886a38e"
+  },
+  "coffee-investment-analysis.qmd": {
+    "coffee-investment-analysis.html": "0d11e797"
+  },
+  "coffee-investment-analysis/coffee-investment-analysis.qmd": {
+    "coffee-investment-analysis.html": "64537cfb"
+  },
+  "sql-database/sql-database.qmd": {
+    "sql-database.html": "010f4ef1"
+  }
+}

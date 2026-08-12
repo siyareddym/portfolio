@@ -1,0 +1,285 @@
+---
+title: "Database Querying with SQL (MS Access)"
+author: "Siya Muthirevulu"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    theme: cosmo
+---
+
+## 1. Overview
+
+A relational database (employees, departments, members, products, transactions, and classes) built across class coursework covering filtering, aggregation, joins, and layered/subqueries. All queries below are copied directly from Access's SQL View (not reconstructed), so the syntax reflects exactly what runs against the database.
+
+## 2. Filtering with WHERE
+
+Pattern matching with a positional wildcard (`S` followed by exactly four characters), combined with multiple conditions and a NULL check to exclude former employees:
+
+```sql
+SELECT
+    tblEmployee.EmpFirst,
+    tblEmployee.EmpLast,
+    tblEmployee.JobTitle,
+    tblEmployee.Salary
+FROM
+    tblEmployee
+WHERE
+    (
+        ((tblEmployee.EmpFirst) LIKE "S????")
+        AND ((tblEmployee.EmpEndDate) IS NULL)
+        AND ((tblEmployee.IsFullTime) = Yes)
+    )
+ORDER BY
+    tblEmployee.Salary DESC;
+```
+
+Date-range filtering with `BETWEEN`, combined with `OR` logic across two states:
+
+```sql
+SELECT
+    tblEmployee.EmpFirst,
+    tblEmployee.EmpLast,
+    tblEmployee.EmpPhone,
+    tblEmployee.EmpStartDate
+FROM
+    tblEmployee
+WHERE
+    (
+        (
+            (tblEmployee.EmpState) = "OK"
+            OR (tblEmployee.EmpState) = "IL"
+        )
+        AND (
+            (tblEmployee.EmpStartDate) BETWEEN #1/1/2017# AND #12/31/2019#
+        )
+    )
+ORDER BY
+    tblEmployee.EmpLast;
+```
+
+## 3. Aggregate Functions
+
+Summary statistics across a filtered subset (part-time employees hired before 2015),  no grouping included here since the result is a single row:
+
+```sql
+SELECT
+    Max(tblEmployee.[HourlyRate]) AS HourlyMax,
+    Min(tblEmployee.[HourlyRate]) AS HourlyMin,
+    Avg(tblEmployee.[HourlyRate]) AS HourlyAvg
+FROM
+    tblEmployee
+WHERE
+    (
+        ((tblEmployee.IsFullTime) = No)
+        AND ((tblEmployee.EmpEndDate) IS NULL)
+        AND ((tblEmployee.EmpStartDate) < #1/1/2015#)
+    );
+```
+
+## 4. GROUP BY with JOIN
+
+Total salary cost per department; an explicit `INNER JOIN` linking two tables on their shared key, then `GROUP BY` to roll salaries up by department:
+
+```sql
+SELECT
+    tblEmpDepartment.EmpDepartmentName,
+    Sum(tblEmployee.[Salary]) AS TotalSalaries
+FROM
+    tblEmpDepartment
+    INNER JOIN tblEmployee ON tblEmpDepartment.EmpDepartmentID = tblEmployee.EmpDepartmentID
+WHERE
+    (
+        ((tblEmployee.IsFullTime) = Yes)
+        AND ((tblEmployee.EmpEndDate) IS NULL)
+    )
+GROUP BY
+    tblEmpDepartment.EmpDepartmentName
+ORDER BY
+    Sum(tblEmployee.[Salary]) DESC;
+```
+
+## 5. GROUP BY with HAVING, Calculated Fields, and Multi-Table Joins
+
+The most involved query in the set: revenue and commission per employee, computed from a calculated field (`Quantity × SellingPrice × (1 - Discount)`), joined across four tables, grouped by employee, and then **filtered on the aggregated result itself** using `HAVING` — showing employees whose total revenue hit $5,000+, something a `WHERE` clause can't do since `WHERE` filters rows before aggregation, not after:
+
+```sql
+SELECT
+    tblEmployee.EmployeeID,
+    [EmpLast] & ", " & [EmpFirst] AS Name,
+    Sum(
+        (
+            [Quantity] * [SellingPrice] * (1 - [ProductDiscount])
+        )
+    ) AS Revenue,
+    Sum(
+        (
+            [Quantity] * [SellingPrice] * (1 - [ProductDiscount])
+        ) * 0.05
+    ) AS CommissionAmt
+FROM
+    (
+        tblEmployee
+        INNER JOIN tblTransaction ON tblEmployee.EmployeeID = tblTransaction.ProcessedBy
+    )
+    INNER JOIN (
+        tblProduct
+        INNER JOIN tblProductInTransaction ON tblProduct.ProductID = tblProductInTransaction.ProductID
+    ) ON tblTransaction.TransactionID = tblProductInTransaction.TransactionID
+WHERE
+    (
+        ((tblTransaction.TransactionLocation) <> "Online")
+        AND (
+            (tblTransaction.TransactionDate) BETWEEN #1/1/2024# AND #10/31/2024#
+        )
+        AND ((tblEmployee.EmpEndDate) IS NULL)
+    )
+GROUP BY
+    tblEmployee.EmployeeID,
+    [EmpLast] & ", " & [EmpFirst]
+HAVING
+    (
+        (
+            Sum(
+                (
+                    [Quantity] * [SellingPrice] * (1 - [ProductDiscount])
+                )
+            )
+        ) >= 5000
+    )
+ORDER BY
+    [EmpLast] & ", " & [EmpFirst];
+```
+
+## 6. Conditional Logic
+
+`IIf()`, which is Access's equivalent of SQL Server's `CASE WHEN`, used to derive a Yes/No flag from an existing field rather than storing it redundantly:
+
+```sql
+SELECT
+    tblEmployee.EmployeeID,
+    tblEmployee.EmpFirst,
+    tblEmployee.EmpLast,
+    tblEmployee.JobTitle,
+    IIf([JobTitle] = 1, "Yes", "No") AS BonusEligible
+FROM
+    tblEmployee
+WHERE
+    (
+        ((tblEmployee.IsFullTime) = Yes)
+        AND ((tblEmployee.EmpEndDate) IS NULL)
+    )
+ORDER BY
+    tblEmployee.EmployeeID,
+    tblEmployee.EmpLast;
+```
+
+## 7. Layered Queries (Subquery Pattern)
+
+Access's query designer doesn't support inline subqueries as cleanly as full SQL Server, so the standard workaround and the pattern used throughout this database is to save intermediate results as their own queries, then reference those saved queries the same way you'd reference a table.
+
+**Goal:** find what percentage of all class enrollments each class represents.
+
+Query 1 — total enrollment across all classes (the denominator):
+```sql
+SELECT
+    Count(tblEmployeeInClass.EmployeeID) AS TotalEnrollment
+FROM
+    tblEmployeeInClass;
+```
+
+Query 2 — enrollment per class (the numerator), grouped with a join:
+```sql
+SELECT
+    tblClass.ClassName,
+    Count(tblEmployeeInClass.EmployeeID) AS ClassEnrollment
+FROM
+    tblClass
+    INNER JOIN tblEmployeeInClass ON tblClass.ClassID = tblEmployeeInClass.ClassID
+GROUP BY
+    tblClass.ClassName;
+```
+
+Query 3 — divides one saved query by the other to get the final percentage:
+```sql
+SELECT
+    [qryCH09-DIS03_Numerator].ClassName,
+    [ClassEnrollment] / [TotalEnrollment] AS PercentOfEnrollment
+FROM
+    [qryCH09-DIS03_Numerator],
+    [qryCH09-DIS03_Denominator]
+ORDER BY
+    [ClassEnrollment] / [TotalEnrollment] DESC;
+```
+
+**Second example of the same pattern** — identifying members who spent above the average in Q4 2024. This is functionally equivalent to a correlated subquery with `HAVING SUM(...) > (SELECT AVG(...))` in full SQL, decomposed into three linked steps:
+
+Query 1 — total spend per member in Q4:
+```sql
+SELECT
+    tblMember.MemberID,
+    tblMember.MemberFirstN,
+    tblMember.MemberLastN,
+    tblMember.MemberEmail,
+    Sum(
+        [Quantity] * [SellingPrice] * (1 - [ProductDiscount])
+    ) AS TotalSpent
+FROM
+    (
+        tblMember
+        INNER JOIN tblTransaction ON tblMember.MemberID = tblTransaction.MemberID
+    )
+    INNER JOIN (
+        tblProduct
+        INNER JOIN tblProductInTransaction ON tblProduct.ProductID = tblProductInTransaction.ProductID
+    ) ON tblTransaction.TransactionID = tblProductInTransaction.TransactionID
+WHERE
+    (
+        (tblTransaction.TransactionDate) BETWEEN #10/1/2024# AND #12/31/2024#
+    )
+GROUP BY
+    tblMember.MemberID,
+    tblMember.MemberFirstN,
+    tblMember.MemberLastN,
+    tblMember.MemberEmail;
+```
+
+Query 2 — the average of that result:
+```sql
+SELECT
+    Avg([qryCH09-CAS01-Q4AmtSpent].TotalSpent) AS AvgOfTotalSpent
+FROM
+    [qryCH09-CAS01-Q4AmtSpent];
+```
+
+Query 3 — members whose spend exceeds that average:
+```sql
+SELECT
+    [qryCH09-CAS01-Q4AmtSpent].MemberID,
+    [qryCH09-CAS01-Q4AmtSpent].MemberFirstN,
+    [qryCH09-CAS01-Q4AmtSpent].MemberLastN,
+    [qryCH09-CAS01-Q4AmtSpent].MemberEmail,
+    [qryCH09-CAS01-Q4AmtSpent].TotalSpent
+FROM
+    [qryCH09-CAS01-AverageSpent],
+    [qryCH09-CAS01-Q4AmtSpent]
+WHERE
+    (
+        ([qryCH09-CAS01-Q4AmtSpent].TotalSpent) > [AvgOfTotalSpent]
+    );
+```
+
+## 8. Skills Summary
+
+- Filtering: `WHERE`, wildcard `LIKE`, `BETWEEN`, `IS NULL`, compound `AND`/`OR` logic
+- Aggregation: `SUM`, `AVG`, `COUNT`, `MAX`, `MIN`, with and without `GROUP BY`
+- Filtering on aggregates specifically with `HAVING` (distinct from filtering rows with `WHERE`)
+- Multi-table `INNER JOIN`, including joins nested across more than two tables
+- Calculated fields (arithmetic and string concatenation in `SELECT`)
+- Conditional logic with `IIf()`
+- Query decomposition — building layered queries to simulate subqueries
+
+---
+
+*Coursework database, Kelley School of Business, Indiana University.*
