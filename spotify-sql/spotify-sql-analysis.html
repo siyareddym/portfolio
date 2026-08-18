@@ -9,7 +9,7 @@
 <meta name="author" content="Siya Muthirevulu">
 <meta name="dcterms.date" content="2026-08-18">
 
-<title>Cleaning Corrupted POS Data in Excel – Data Portfolio</title>
+<title>Spotify Track Analysis with SQL (SQLite) – Data Portfolio</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -24,6 +24,41 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -107,7 +142,7 @@ ul.task-list li input[type="checkbox"] {
 <span class="menu-text">SQL</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link active" href="../excel-data-cleaning/excel-data-cleaning.html" aria-current="page"> 
+    <a class="nav-link" href="../excel-data-cleaning/excel-data-cleaning.html"> 
 <span class="menu-text">Excel Cleaning</span></a>
   </li>  
   <li class="nav-item">
@@ -115,7 +150,7 @@ ul.task-list li input[type="checkbox"] {
 <span class="menu-text">Power BI &amp; Excel Analysis</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="../spotify-sql/spotify-sql-analysis.html"> 
+    <a class="nav-link active" href="../spotify-sql/spotify-sql-analysis.html" aria-current="page"> 
 <span class="menu-text">Spotify SQL</span></a>
   </li>  
   <li class="nav-item">
@@ -138,13 +173,13 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul class="collapse">
-  <li><a href="#problem-statement" id="toc-problem-statement" class="nav-link active" data-scroll-target="#problem-statement">1. Problem Statement</a></li>
-  <li><a href="#date-repair" id="toc-date-repair" class="nav-link" data-scroll-target="#date-repair">2. Date Repair</a></li>
-  <li><a href="#item-name-repair" id="toc-item-name-repair" class="nav-link" data-scroll-target="#item-name-repair">3. Item Name Repair</a></li>
-  <li><a href="#price-point-standardization" id="toc-price-point-standardization" class="nav-link" data-scroll-target="#price-point-standardization">4. Price Point Standardization</a></li>
-  <li><a href="#exploratory-analysis" id="toc-exploratory-analysis" class="nav-link" data-scroll-target="#exploratory-analysis">5. Exploratory Analysis</a></li>
-  <li><a href="#pivot-table-analysis" id="toc-pivot-table-analysis" class="nav-link" data-scroll-target="#pivot-table-analysis">6. Pivot Table Analysis</a></li>
-  <li><a href="#what-id-improve" id="toc-what-id-improve" class="nav-link" data-scroll-target="#what-id-improve">7. What I’d Improve</a></li>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">1. Overview</a></li>
+  <li><a href="#data-quality-check-first" id="toc-data-quality-check-first" class="nav-link" data-scroll-target="#data-quality-check-first">2. Data Quality Check First</a></li>
+  <li><a href="#top-5-tracks-per-genre-window-functions" id="toc-top-5-tracks-per-genre-window-functions" class="nav-link" data-scroll-target="#top-5-tracks-per-genre-window-functions">3. Top 5 Tracks Per Genre (Window Functions)</a></li>
+  <li><a href="#artists-above-average-popularity-cte-deduplication" id="toc-artists-above-average-popularity-cte-deduplication" class="nav-link" data-scroll-target="#artists-above-average-popularity-cte-deduplication">4. Artists Above Average Popularity (CTE + Deduplication)</a></li>
+  <li><a href="#tempo-tiers-vs.-danceability-case-when-bucketing" id="toc-tempo-tiers-vs.-danceability-case-when-bucketing" class="nav-link" data-scroll-target="#tempo-tiers-vs.-danceability-case-when-bucketing">5. Tempo Tiers vs.&nbsp;Danceability (CASE WHEN Bucketing)</a></li>
+  <li><a href="#reusable-view-genre-summary" id="toc-reusable-view-genre-summary" class="nav-link" data-scroll-target="#reusable-view-genre-summary">6. Reusable View: Genre Summary</a></li>
+  <li><a href="#skills-demonstrated" id="toc-skills-demonstrated" class="nav-link" data-scroll-target="#skills-demonstrated">7. Skills Demonstrated</a></li>
   </ul>
 </nav>
     </div>
@@ -153,7 +188,7 @@ ul.task-list li input[type="checkbox"] {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Cleaning Corrupted POS Data in Excel</h1>
+<h1 class="title">Spotify Track Analysis with SQL (SQLite)</h1>
 </div>
 
 
@@ -182,195 +217,231 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p><a href="Excel_Data_Cleaning_Project.xlsm">Download the full workbook (.xlsm)</a></p>
-<section id="problem-statement" class="level2">
-<h2 class="anchored" data-anchor-id="problem-statement">1. Problem Statement</h2>
-<p>A local coffee shop’s point-of-sale system presented with corrupted characters, malformed dates, and inconsistent formatting into one week of transaction data. The task: rebuild a <strong>dynamic</strong> cleaning process that could take a fresh batch of corrupted data pasted into the same columns and re-clean it automatically, without manually rewriting formulas each time. Then, run exploratory analysis on the recovered data.</p>
-<p>Three fields needed cleaning: <strong>Date</strong>, <strong>Item</strong>, and <strong>PricePoint</strong>. All formulas below are live Excel formulas, not one-time manual fixes.</p>
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">1. Overview</h2>
+<p>A 114,000-row dataset of Spotify tracks (genre, artist, popularity, and audio features like danceability, energy, and tempo), queried using <strong>SQLite via DB Browser for SQLite</strong> — a different engine than the <a href="../sql-database/sql-database.html">MS Access SQL project</a> elsewhere on this site, deliberately chosen to show window functions and CTEs, which Access doesn’t support natively.</p>
+<p><a href="https://www.kaggle.com/datasets/maharshipandya/-spotify-tracks-dataset">Dataset: Spotify Tracks Dataset, Kaggle</a></p>
 </section>
-<section id="date-repair" class="level2">
-<h2 class="anchored" data-anchor-id="date-repair">2. Date Repair</h2>
-<p>Dates arrived as inconsistent text strings like <code>"2025++5/25"</code> instead of real Excel dates.</p>
-<pre class="excel"><code>=TEXTSPLIT(B2,{"++","/"})</code></pre>
-<p>Splits the raw string on two different delimiters at once (<code>++</code> and <code>/</code>) into separate year/month/day pieces with the <code>TEXTSPLIT</code> function that handles multiple delimiters in one call, instead of nesting several <code>LEFT</code>/<code>MID</code>/<code>FIND</code> formulas.</p>
-<pre class="excel"><code>=DATE(J2,K2,L2)
-=IF(M2=9999,"???",M2)</code></pre>
-<p>Reconstructs a real date from the split parts, then flags unrecoverable rows with <code>???</code> instead of a broken value — so downstream analysis never silently includes garbage.</p>
-<section id="before-after" class="level3">
-<h3 class="anchored" data-anchor-id="before-after">Before → After</h3>
+<section id="data-quality-check-first" class="level2">
+<h2 class="anchored" data-anchor-id="data-quality-check-first">2. Data Quality Check First</h2>
+<p>Before writing any analytical queries, I checked whether every row represented a distinct track:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> total_rows, <span class="fu">COUNT</span>(<span class="kw">DISTINCT</span> track_id) <span class="kw">AS</span> unique_tracks</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> tracks;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Result: 114,000 total rows, but only 89,741 unique tracks.</strong> The dataset is structured as exactly 114 genres × 1,000 tracks each — and a track that fits multiple genres (e.g., a blues-rock song) simply gets a separate row per genre tag, sharing the same <code>track_id</code>. Confirmed directly:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> track_name, artists, <span class="fu">COUNT</span>(<span class="kw">DISTINCT</span> track_genre) <span class="kw">AS</span> genre_count</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> tracks</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> track_id</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">HAVING</span> genre_count <span class="op">&gt;</span> <span class="dv">1</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> genre_count <span class="kw">DESC</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="kw">LIMIT</span> <span class="dv">10</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <table class="caption-top table">
 <thead>
 <tr class="header">
-<th>Transaction ID</th>
-<th>Raw Date</th>
-<th>Cleaned Date</th>
+<th>Track</th>
+<th>Artist</th>
+<th>Genres</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>427999</td>
-<td><code>2025++5/25</code></td>
-<td>5/25/2025</td>
+<td>Baby Blue – Remastered 2010</td>
+<td>Badfinger</td>
+<td>9</td>
 </tr>
 <tr class="even">
-<td>428002</td>
-<td><code>1927++5/17</code></td>
-<td><strong><code>???</code></strong></td>
+<td>Layla</td>
+<td>Derek &amp; The Dominos</td>
+<td>8</td>
 </tr>
 </tbody>
 </table>
-<p>That second row exposes a genuine bug, verified against the workbook’s own computed values — and it’s more interesting than a simple missed edge case. <code>DATE(1927, 5, 17)</code> doesn’t fail to parse; it correctly returns a valid date serial number. The problem is that this particular date’s serial number <strong>is exactly 9999</strong> — the same value chosen as the sentinel for “this date is invalid.” So a perfectly legitimate (if suspiciously old) date gets <em>wrongly flagged as broken</em>, precisely because the sentinel value wasn’t actually impossible to collide with. This is a real, well-known category of bug in data engineering — picking a “magic value” to mean missing/invalid without confirming it can never occur naturally in the data. A more robust fix would use a value clearly outside any valid date serial range (e.g., a negative number, or a dedicated boolean flag column) instead of overloading a plausible date value as the error signal.</p>
+<p>This mattered for every query that followed: <strong>genre-level questions can use the full table</strong> (each genre tag is a legitimate row), but <strong>artist- or track-level questions need to deduplicate first</strong>, or an artist with a track tagged across several genres would get counted multiple times. Every query below that aggregates by artist or track starts from a <code>unique_tracks</code> CTE for exactly this reason.</p>
 </section>
+<section id="top-5-tracks-per-genre-window-functions" class="level2">
+<h2 class="anchored" data-anchor-id="top-5-tracks-per-genre-window-functions">3. Top 5 Tracks Per Genre (Window Functions)</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">WITH</span> ranked <span class="kw">AS</span> (</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">SELECT</span> track_name, artists, track_genre, popularity,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>         <span class="fu">RANK</span>() <span class="kw">OVER</span> (<span class="kw">PARTITION</span> <span class="kw">BY</span> track_genre <span class="kw">ORDER</span> <span class="kw">BY</span> popularity <span class="kw">DESC</span>) <span class="kw">AS</span> genre_rank</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">FROM</span> tracks</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> ranked</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> genre_rank <span class="op">&lt;=</span> <span class="dv">5</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> track_genre, genre_rank;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>RANK() OVER (PARTITION BY track_genre ORDER BY popularity DESC)</code> restarts the ranking independently within every genre, in a single pass — no per-genre subqueries needed.</p>
+<p>Worth noting from the actual output: in the <code>classical</code> genre, four tracks tied at a popularity score of 70 all correctly received the same rank (4), with the next distinct value jumping straight to rank 8 — <code>RANK()</code>’s documented tie behavior (as opposed to <code>DENSE_RANK()</code>, which wouldn’t leave that gap). Confirms the ranking logic is handling ties correctly, not just running without errors.</p>
 </section>
-<section id="item-name-repair" class="level2">
-<h2 class="anchored" data-anchor-id="item-name-repair">3. Item Name Repair</h2>
-<p>Item names had corrupted encoding artifacts (<code>©</code>, <code>☐</code>, <code>§</code>) injected in place of spaces.</p>
-<pre class="excel"><code>=SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(D2,"©"," "),"☐"," "),"§"," ")
-=PROPER(TRIM(CLEAN(P2)))</code></pre>
-<p>Nested <code>SUBSTITUTE()</code> calls strip each corrupted character in turn, then <code>CLEAN()</code> removes any remaining non-printable characters, <code>TRIM()</code> collapses extra whitespace, and <code>PROPER()</code> normalizes capitalization — a standard three-function stack for text normalization.</p>
-<section id="before-after-1" class="level3">
-<h3 class="anchored" data-anchor-id="before-after-1">Before → After</h3>
+<section id="artists-above-average-popularity-cte-deduplication" class="level2">
+<h2 class="anchored" data-anchor-id="artists-above-average-popularity-cte-deduplication">4. Artists Above Average Popularity (CTE + Deduplication)</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">WITH</span> unique_tracks <span class="kw">AS</span> (</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">SELECT</span> <span class="kw">DISTINCT</span> track_id, artists, popularity</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">FROM</span> tracks</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>),</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>artist_avg <span class="kw">AS</span> (</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">SELECT</span> artists, <span class="fu">ROUND</span>(<span class="fu">AVG</span>(popularity), <span class="dv">1</span>) <span class="kw">AS</span> avg_popularity, <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> track_count</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">FROM</span> unique_tracks</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">GROUP</span> <span class="kw">BY</span> artists</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="kw">HAVING</span> track_count <span class="op">&gt;=</span> <span class="dv">3</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> artist_avg</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> avg_popularity <span class="op">&gt;</span> (<span class="kw">SELECT</span> <span class="fu">AVG</span>(popularity) <span class="kw">FROM</span> unique_tracks)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> avg_popularity <span class="kw">DESC</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="kw">LIMIT</span> <span class="dv">15</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Two chained CTEs: <code>unique_tracks</code> removes the genre-duplication found in Section 2, then <code>artist_avg</code> aggregates by artist — restricted to artists with at least 3 tracks, so a single 100-popularity one-hit-wonder doesn’t dominate the list.</p>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
 <thead>
 <tr class="header">
-<th>Raw Item</th>
-<th>Cleaned Item</th>
+<th>Artist</th>
+<th>Avg. Popularity</th>
+<th>Tracks</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>Candy©bar</code></td>
-<td>Candy Bar</td>
+<td>Harry Styles</td>
+<td>92.0</td>
+<td>3</td>
 </tr>
 <tr class="even">
-<td><code>French☐press☐</code></td>
-<td>French Press</td>
+<td>Olivia Rodrigo</td>
+<td>87.4</td>
+<td>5</td>
 </tr>
 <tr class="odd">
-<td><code>§French§press</code></td>
-<td>French Press</td>
+<td>Bad Bunny</td>
+<td>85.4</td>
+<td>26</td>
 </tr>
 <tr class="even">
-<td><code>Scone©with©clotted©cream©and©jam</code></td>
-<td>Scone With Clotted Cream And Jam</td>
+<td>IVE</td>
+<td>84.0</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td>Morgan Wallen</td>
+<td>83.3</td>
+<td>3</td>
 </tr>
 </tbody>
 </table>
+<p>Bad Bunny standing out with 26 tracks <em>and</em> an 85.4 average is a good sanity check on the query — it lines up with his real-world status as one of the most-streamed artists globally, not just a query returning syntactically valid but meaningless output.</p>
 </section>
-</section>
-<section id="price-point-standardization" class="level2">
-<h2 class="anchored" data-anchor-id="price-point-standardization">4. Price Point Standardization</h2>
-<pre class="excel"><code>=SUBSTITUTE(E2,"ounce","oz")</code></pre>
-<p>Standardizes unit labeling so it matches the format used in the shop’s existing price list (e.g., <code>"12 ounce"</code> → <code>"12 oz"</code>), keeping the cleaned data consistent with everything already on file.</p>
-</section>
-<section id="exploratory-analysis" class="level2">
-<h2 class="anchored" data-anchor-id="exploratory-analysis">5. Exploratory Analysis</h2>
-<p>Once the data was clean, I built a lookup key and ran revenue analysis:</p>
-<pre class="excel"><code>=CONCAT(D2,F2)
-=E2*XLOOKUP(L2,PriceListData!$F$2:$F$97,PriceListData!$E$2:$E$97)</code></pre>
-<p><code>CONCAT</code> builds a composite key (Item + Price Point, e.g.&nbsp;<code>"Cappuccino12 oz"</code>) so each specific size/variant of a product can be matched to its correct price via <code>XLOOKUP</code> — the modern, more flexible successor to <code>VLOOKUP</code> (it can look left or right, and returns a clear result instead of <code>#N/A</code> when paired with its <code>if_not_found</code> argument).</p>
-<pre class="excel"><code>=UNIQUE(TransactionData!A2:A7396)
-=SUMIF(TransactionData!$A$2:$A$7396, O2, TransactionData!$M$2:$M$7396)</code></pre>
-<p><code>UNIQUE</code> deduplicates transaction IDs (a single purchase can span multiple rows if several items were bought together), and <code>SUMIF</code> rolls up total revenue per transaction.</p>
-<p>From there, I computed a full descriptive statistics summary including mean, median, standard deviation, skewness, and a five-number summary via <code>QUARTILE.INC</code> along with a histogram of the per-transaction revenue distribution to visualize spending patterns.</p>
-</section>
-<section id="pivot-table-analysis" class="level2">
-<h2 class="anchored" data-anchor-id="pivot-table-analysis">6. Pivot Table Analysis</h2>
-<p>With the data cleaned, I used PivotTables to answer a set of specific business questions, each one built on a “scratch” sheet, then the headline answer surfaced onto a clean summary sheet so the underlying pivot mechanics don’t clutter the final report.</p>
-<section id="product-analysis" class="level3">
-<h3 class="anchored" data-anchor-id="product-analysis">Product Analysis</h3>
+<section id="tempo-tiers-vs.-danceability-case-when-bucketing" class="level2">
+<h2 class="anchored" data-anchor-id="tempo-tiers-vs.-danceability-case-when-bucketing">5. Tempo Tiers vs.&nbsp;Danceability (CASE WHEN Bucketing)</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">WITH</span> unique_tracks <span class="kw">AS</span> (</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">SELECT</span> <span class="kw">DISTINCT</span> track_id, tempo, danceability, popularity</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">FROM</span> tracks</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">CASE</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> tempo <span class="op">&lt;</span> <span class="dv">90</span> <span class="cf">THEN</span> <span class="st">'Slow'</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> tempo <span class="op">&lt;</span> <span class="dv">130</span> <span class="cf">THEN</span> <span class="st">'Medium'</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">ELSE</span> <span class="st">'Fast'</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  <span class="cf">END</span> <span class="kw">AS</span> tempo_tier,</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ROUND</span>(<span class="fu">AVG</span>(danceability), <span class="dv">3</span>) <span class="kw">AS</span> avg_danceability,</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ROUND</span>(<span class="fu">AVG</span>(popularity), <span class="dv">1</span>) <span class="kw">AS</span> avg_popularity,</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> n_tracks</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> unique_tracks</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> tempo_tier;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
 <thead>
 <tr class="header">
-<th>Question</th>
-<th>Pivot Table Structure</th>
-<th>Answer</th>
+<th>Tempo Tier</th>
+<th>Avg. Danceability</th>
+<th>Avg. Popularity</th>
+<th>Tracks</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>What item appears in the most transactions?</td>
-<td>Rows: <code>Item</code> → Values: <code>Count of Transaction ID</code></td>
-<td>Pourover</td>
+<td>Slow</td>
+<td>0.474</td>
+<td>32.5</td>
+<td>13,460</td>
 </tr>
 <tr class="even">
-<td>What item was purchased in the largest total quantity?</td>
-<td>Rows: <code>Item</code> → Values: <code>Sum of Qty</code></td>
-<td>Pourover (4,144 units)</td>
+<td>Medium</td>
+<td>0.615</td>
+<td>33.2</td>
+<td>43,575</td>
 </tr>
 <tr class="odd">
-<td>What <em>food</em> item was purchased in the largest total quantity?</td>
-<td>Same as above, <strong>filtered</strong> to <code>Category = Food</code></td>
-<td>Sticky bun</td>
-</tr>
-<tr class="even">
-<td>Which type of whole beans sold in the largest total quantity?</td>
-<td>Rows: <code>Item</code> → Values: <code>Sum of Qty</code>, <strong>filtered</strong> to <code>Type = Whole beans</code></td>
-<td>Single-origin (210 vs.&nbsp;House blend’s 118)</td>
+<td>Fast</td>
+<td>0.530</td>
+<td>33.5</td>
+<td>33,426</td>
 </tr>
 </tbody>
 </table>
-<p>The filtered versions are the more interesting technique here: rather than building a separate pivot from scratch for “food items only” or “whole beans only,” I applied a report filter to the same base structure having the same fields, narrower scope, different question answered.</p>
+<p><strong>The actual finding here matters more than the query syntax:</strong> danceability moves meaningfully across tempo tiers (0.474 → 0.615 → 0.530 — medium-tempo tracks are the most danceable, not the fastest ones), but popularity barely moves at all (32.5 → 33.2 → 33.5). Tempo has a real relationship with danceability; it has essentially none with how popular a track becomes.</p>
 </section>
-<section id="trend-analysis" class="level3">
-<h3 class="anchored" data-anchor-id="trend-analysis">Trend Analysis</h3>
+<section id="reusable-view-genre-summary" class="level2">
+<h2 class="anchored" data-anchor-id="reusable-view-genre-summary">6. Reusable View: Genre Summary</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">VIEW</span> genre_summary <span class="kw">AS</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> track_genre,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>       <span class="fu">ROUND</span>(<span class="fu">AVG</span>(popularity), <span class="dv">1</span>) <span class="kw">AS</span> avg_popularity,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>       <span class="fu">ROUND</span>(<span class="fu">AVG</span>(danceability), <span class="dv">3</span>) <span class="kw">AS</span> avg_danceability,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>       <span class="fu">ROUND</span>(<span class="fu">AVG</span>(energy), <span class="dv">3</span>) <span class="kw">AS</span> avg_energy,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>       <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> n_tracks</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> tracks</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> track_genre;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> genre_summary <span class="kw">ORDER</span> <span class="kw">BY</span> avg_popularity <span class="kw">DESC</span> <span class="kw">LIMIT</span> <span class="dv">10</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
 <thead>
 <tr class="header">
-<th>Question</th>
-<th>Pivot Table Structure</th>
-<th>Answer</th>
+<th>Genre</th>
+<th>Avg. Popularity</th>
+<th>Avg. Danceability</th>
+<th>Avg. Energy</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>What hour does hot drink revenue peak?</td>
-<td>Rows: <code>Time (Hour)</code> → Values: <code>Sum of Revenue</code>, filtered to <code>Type = Hot drink</code></td>
-<td>10 AM</td>
+<td>pop-film</td>
+<td>59.3</td>
+<td>0.597</td>
+<td>0.605</td>
 </tr>
 <tr class="even">
-<td>What days have the lowest sales for the most popular brewed coffee size?</td>
-<td>Rows: <code>Day of the Week</code> → Values: <code>Sum of Qty</code>, filtered to <code>Category = Brewed coffee</code>, <code>Price Point = 12 oz</code></td>
-<td>Monday and Wednesday</td>
+<td>k-pop</td>
+<td>56.9</td>
+<td>0.648</td>
+<td>0.676</td>
 </tr>
 <tr class="odd">
-<td>Which product type has the most dramatic swing in sales across the week?</td>
-<td>Rows: <code>Category</code> × Columns: <code>Day of the Week</code> → Values: <code>Sum of Qty</code>, plus a calculated <strong>range</strong> column (<code>MAX − MIN</code> across the week)</td>
-<td>Hot Drinks (98-unit swing — largest of any category)</td>
+<td>chill</td>
+<td>53.7</td>
+<td>0.664</td>
+<td>0.427</td>
+</tr>
+<tr class="even">
+<td>sad</td>
+<td>52.4</td>
+<td>0.692</td>
+<td>0.462</td>
+</tr>
+<tr class="odd">
+<td>grunge</td>
+<td>49.6</td>
+<td>0.457</td>
+<td>0.803</td>
 </tr>
 </tbody>
 </table>
-<p>That third one is a two-dimensional pivot, a category down the rows, weekday across the columns, with an extra calculated column added alongside the pivot to measure volatility, not just totals. Turning “which category has the most dramatic swing” into a concrete number (rather than eyeballing a table) is the kind of small addition that makes a pivot table answer a sharper question than it can out of the box.</p>
+<p>A <code>VIEW</code> saves this aggregation permanently in the database — anyone querying it afterward just runs <code>SELECT * FROM genre_summary</code> instead of rewriting the <code>GROUP BY</code> logic from scratch.</p>
 </section>
-<section id="basket-analysis-a-transaction-item-incidence-matrix" class="level3">
-<h3 class="anchored" data-anchor-id="basket-analysis-a-transaction-item-incidence-matrix">Basket Analysis: A Transaction × Item Incidence Matrix</h3>
-<p>The most advanced pivot in the workbook answers: <strong>“What cold drink item is most often purchased alongside something from the beans category?”</strong> (Answer: <strong>Frappé</strong>.)</p>
-<p>Instead of a normal summary pivot, this one uses <strong>Rows: <code>Transaction ID</code>, Columns: <code>Item</code>, Values: <code>Count of Category</code></strong> — turning the pivot into a large incidence matrix where each row is one transaction and each column is one item, with a 1 marking “this item was in this transaction.” That structure is what makes co-occurrence analysis possible: it lets you see which items tend to show up in the <em>same</em> transaction as beans purchases, which a simple one-dimensional pivot can’t answer. This is the same basic idea behind real market-basket analysis (“customers who bought X also bought Y”), built here entirely with native PivotTable features rather than a specialized tool.</p>
-</section>
-</section>
-<section id="what-id-improve" class="level2">
-<h2 class="anchored" data-anchor-id="what-id-improve">7. What I’d Improve</h2>
+<section id="skills-demonstrated" class="level2">
+<h2 class="anchored" data-anchor-id="skills-demonstrated">7. Skills Demonstrated</h2>
 <ul>
-<li>Replace the <code>9999</code> sentinel with a value guaranteed never to collide with a real date serial number (see Section 2), or better, use a separate boolean flag column instead of overloading the date field itself to signal validity.</li>
-<li>Add a validation flag column that counts how many corrections were applied per row, to make it easy to spot rows that needed unusually heavy cleanup and might warrant a manual look.</li>
-<li>The transaction × item incidence matrix (Section 6) is powerful but manual — for a larger item catalog, a proper association-rule approach (support/confidence/lift, as in market-basket analysis) would scale better than reading off a large pivot table by eye.</li>
+<li>Window functions: <code>RANK() OVER (PARTITION BY ... ORDER BY ...)</code>, including correct handling of tied values</li>
+<li>Common Table Expressions (CTEs), including chaining two CTEs together in one query</li>
+<li>Deliberate deduplication before aggregation — recognizing when raw data needs cleaning <em>before</em> a <code>GROUP BY</code>, not just after</li>
+<li><code>CASE WHEN</code> bucketing to convert a continuous variable into categorical tiers for comparison</li>
+<li>Scalar subqueries used as a filter condition (<code>WHERE avg_popularity &gt; (SELECT AVG(...) ...)</code>)</li>
+<li><code>CREATE VIEW</code> for reusable, persisted aggregations</li>
+<li>Data-quality verification as a first step, before any analytical query — and using that finding (genre duplication) to directly shape how later queries were written</li>
 </ul>
 <hr>
-<p><em>Course project for K303 (Data Analytics), Kelley School of Business, Indiana University.</em></p>
+<p><em>Data source: <a href="https://www.kaggle.com/datasets/maharshipandya/-spotify-tracks-dataset">Spotify Tracks Dataset</a>, Kaggle.</em></p>
 
 
 </section>
